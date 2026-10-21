@@ -1,5 +1,3 @@
-package org.example;
-
 import java.util.Scanner;
 import java.util.Random;
 import java.util.ArrayList;
@@ -70,7 +68,7 @@ class TUI{
     }
 }
 
-class Entety{
+class Entity{
     String name;
     int health;
     int maxHealth;
@@ -81,7 +79,7 @@ class Entety{
     boolean alive;
     int expToNextLevel = 100;
 
-    public Entety(String name, int health, int maxHealth, int attackDamage, int coins, int exp, boolean alive, int level) {
+    public Entity(String name, int health, int maxHealth, int attackDamage, int coins, int exp, boolean alive, int level) {
         this.name = name;
         this.health = health;
         this.maxHealth = maxHealth;
@@ -91,21 +89,19 @@ class Entety{
         this.level = level;
         this.alive = alive;
     }
+
+    public void attack(Entity entity, Entity target){
+        if (target != null && target.alive) {
+            target.health = Math.max(0, target.health - entity.attackDamage);
+        }
+    }
 }
 
 // Was kann Player und was hat Player für Werte
-class Player extends Entety{
+class Player extends Entity{
 
     public Player(String name, int health, int maxHealth, int attackDamage, int coins, int exp, boolean alive, int level) {
         super(name, health, maxHealth, attackDamage, coins, exp, alive, level);
-    }
-
-    public void attack(Enemy target) {
-        target.health = Math.max(0, target.health - attackDamage);
-    }
-
-    public void attackBoss(Boss boss) {
-        boss.health = Math.max(0, boss.health - attackDamage);
     }
 
     public void heal() {
@@ -130,26 +126,22 @@ class Player extends Entety{
 }
 
 // hier wird Enemy erstellt und Angriff gesteuert
-class Enemy extends Entety{
+class Enemy extends Entity{
 
     public Enemy(String name, int health, int maxHealth, int attackDamage, int coins, int exp, boolean alive, int level) {
         super(name, health, maxHealth, attackDamage, coins, exp, alive, level);
     }
 
-    public void attack(Player target) {
-        target.health = Math.max(0, target.health - attackDamage);
-    }
+    public void revive(){health = maxHealth;}
 }
 
-class Boss extends Entety{
+class Boss extends Entity{
 
     public Boss(String name, int health, int maxHealth, int attackDamage, int coins, int exp, boolean alive, int level) {
         super(name, health, maxHealth, attackDamage, coins, exp, alive, level);
     }
 
-    public void attack(Player target) {
-        target.health = Math.max(0, target.health - attackDamage);
-    }
+    public void revive(){health = maxHealth;}
 }
 
 // Item Logik, hier werden Items erstellt und verwendet
@@ -170,7 +162,7 @@ class Item{
         this.onetimeuse = onetimeuse;
     }
 
-    public void use(Player player, Enemy enemy)
+    public void use(Player player, Entity entity)
     {
         if(this.heal > 0 && player.health <= player.maxHealth)
         {
@@ -182,23 +174,7 @@ class Item{
 
         if (this.attackDamage > 0)
         {
-            enemy.health = Math.max(0, enemy.health - attackDamage);
-        }
-    }
-
-    public void useOnBoss(Player player, Boss boss)
-    {
-        if(this.heal > 0 && player.health <= player.maxHealth)
-        {
-            if (player.health <= Math.max(player.maxHealth, player.maxHealth - 100))
-            {
-                player.health = Math.min(player.maxHealth, player.health + this.heal);
-            }
-        }
-
-        if (this.attackDamage > 0)
-        {
-            boss.health = Math.max(0, boss.health - attackDamage);
+            entity.health = Math.max(0, entity.health - attackDamage);
         }
     }
 }
@@ -212,12 +188,14 @@ class Game{
         int plchoise = 4;
         // ran = random
         int ran;
+        int ran3;
         int action;
 
         Player[] player = PlayerFactory.createPlayers();
         Enemy[] enemy = EnemyFactory.createEnemy();
         Item[] item = ItemFactory.createItem();
         Boss[] boss = BossFactory.createBoss();
+        Fight fight = new Fight();
         Inventory inventory = new Inventory();
         Level level = new Level();
         Loot loot = new Loot();
@@ -255,11 +233,11 @@ class Game{
         out: while(player[plchoise].health >= 0)
         {
             ran = random.nextInt(3);
-            enemy[ran].health = enemy[ran].maxHealth;
-            int healSleep;
+            ran3 = random.nextInt(3);
+            enemy[ran].revive();
 
             // Kämpfen bis Enemy tot ist
-            fight: while (enemy[ran].health >= 0 || player[plchoise].health >= 0)
+            fight: while (enemy[ran].health >= 0 || boss[ran3].health >= 0 || player[plchoise].health >= 0)
             {
 
                 // Schauen ob Player noch lebt, wenn nicht = spiel beenden
@@ -279,115 +257,7 @@ class Game{
                 tui.playerFight(player[plchoise], enemy[ran]);
 
                 // Auf die auswahl des Players reagieren
-                while (true)
-                {
-                    System.out.println("Waehle deine aktion (1-4):");
-
-                    if (scanner.hasNextInt())
-                    {
-                        action = scanner.nextInt();
-
-                        if (action >= 1 || action <= 4)
-                        {
-                            switch (action)
-                            {
-                                case 1:
-                                    // Angriff Logik
-                                    player[plchoise].attack(enemy[ran]);
-
-                                    if (enemy[ran].health <= 0)
-                                    {
-                                        break;
-                                    }
-                                    else
-                                    {
-                                        enemy[ran].attack(player[plchoise]);
-                                    }
-                                    // TUI
-                                    System.out.println
-                                            (
-                                                    "Der Gegner hat noch " + enemy[ran].health + "/" + enemy[ran].maxHealth + " HP" +
-                                                            "\nDu hast " + enemy[ran].attackDamage + " schaden bekommen. Du hast noch " +
-                                                            player[plchoise].health + "/" + player[plchoise].maxHealth + " HP"
-                                            );
-                                    break;
-
-                                case 2:
-                                    // Player heal Logik
-                                    player[plchoise].heal();
-
-                                    break;
-
-                                case 3:
-                                    // Inventar Logik
-                                    int z = 1;
-                                    int actionInv;
-                                    for(int i = 0; i < inventory.size(); i++)
-                                    {
-                                        Item UpdatetItem = inventory.getItem(i);
-                                        System.out.println("(" + z + ")" + UpdatetItem.name);
-                                        z++;
-                                    }
-
-                                    System.out.println("(" + z + ")" + "Exit");
-
-                                    inv: while (true)
-                                    {
-                                        if (scanner.hasNextInt())
-                                        {
-                                            actionInv = scanner.nextInt();
-
-                                            if (actionInv >= 1 && actionInv <= z)
-                                            {
-                                                if (actionInv == z)
-                                                {
-                                                    break inv;
-                                                }
-                                                actionInv--;
-
-                                                Item selectedItem = inventory.getItem(actionInv);
-                                                selectedItem.use(player[plchoise], enemy[ran]);
-
-                                                if (inventory.getItem(actionInv).onetimeuse == true)
-                                                {
-                                                    inventory.removeItem(selectedItem);
-                                                }
-                                                if (enemy[ran].health > 0)
-                                                {
-                                                    enemy[ran].attack(player[plchoise]);
-                                                }
-                                                break inv;
-                                            }
-                                            else
-                                            {
-                                                System.out.println("Ungueltige Option! Nur Zahlen (1-" + z + ")");
-                                            }
-                                        }
-                                        else
-                                        {
-                                            System.out.println("Das ist keine Zahl!");
-                                            scanner.next();
-                                        }
-                                    }
-
-                                    break;
-                                case 4:
-                                    // fliehen / exit game
-                                    break out;
-                            }
-                            break;
-                        }
-                        else
-                        {
-                            System.out.println("Ungueltige Option! Nur Zahlen (1-4)");
-                        }
-                    }
-                    else
-                    {
-                        System.out.println("Das ist keine Zahl!");
-                        scanner.next();
-                    }
-                }
+                fight.fight(player[plchoise], enemy[ran], inventory, scanner);
 
                 // wenn Enemy tot gibt es dem Player coins, exp und mit Glück chest und shop
                 if (enemy[ran].health == 0)
@@ -406,142 +276,34 @@ class Game{
 
                     if (key2 == ran2)
                     {
-                        int ran3 = random.nextInt(3);
+
+                        System.out.println("Was ist das?");
+                        Thread.sleep(1600);
+                        System.out.println("Boss " + boss[ran3].name + " ist gespawnt");
+                        Thread.sleep(888);
+
                         while (true)
                         {
-                            System.out.println("Was ist das?");
-                            Thread.sleep(1600);
-                            System.out.println("Boss " + boss[ran3].name + " ist gespawnt");
-                            Thread.sleep(888);
-
                             tui.playerFightBoss(player[plchoise], boss[ran3]);
 
-                            while (true)
+                            fight.fight(player[plchoise], boss[ran3], inventory, scanner);
+
+                            if (boss[ran3].health <= 0)
                             {
-                                System.out.println("Waehle deine aktion (1-4):");
+                                System.out.println
+                                        (
+                                                "Du hast den Boss " + boss[ran3].name + " besiegt und hast " + boss[ran3].coins + " Coins und " + boss[ran3].exp + " EP bekommen!" +
+                                                        "\nDruecke Taste ENTER um weiter zu spielen!"
+                                        );
 
-                                if (scanner.hasNextInt())
-                                {
-                                    action = scanner.nextInt();
+                                loot.getBossDrop(player[plchoise], boss[ran3]);
+                                loot.chest(inventory, random);
+                                boss[ran3].revive();
+                                level.levelUp(player[plchoise]);
 
-                                    if (action >= 1 || action <= 4)
-                                    {
-                                        switch (action)
-                                        {
-                                            case 1:
-                                                // Angriff Logik
-                                                player[plchoise].attackBoss(boss[ran3]);
-
-                                                if (boss[ran3].health <= 0)
-                                                {
-                                                    break;
-                                                }
-                                                else
-                                                {
-                                                    boss[ran3].attack(player[plchoise]);
-                                                }
-                                                // TUI
-                                                System.out.println
-                                                        (
-                                                                "Der Gegner hat noch " + boss[ran3].health + "/" + boss[ran3].maxHealth + " HP" +
-                                                                        "\nDu hast " + boss[ran3].attackDamage + " schaden bekommen. Du hast noch " +
-                                                                        player[plchoise].health + "/" + player[plchoise].maxHealth + " HP"
-                                                        );
-                                                break;
-
-                                            case 2:
-                                                // Player heal Logik
-                                                player[plchoise].heal();
-
-                                                break;
-
-                                            case 3:
-                                                // Inventar Logik
-                                                int z = 1;
-                                                int actionInv;
-                                                for(int i = 0; i < inventory.size(); i++)
-                                                {
-                                                    Item UpdatetItem = inventory.getItem(i);
-                                                    System.out.println("(" + z + ")" + UpdatetItem.name);
-                                                    z++;
-                                                }
-
-                                                System.out.println("(" + z + ")" + "Exit");
-
-                                                inv: while (true)
-                                                {
-                                                    if (scanner.hasNextInt())
-                                                    {
-                                                        actionInv = scanner.nextInt();
-
-                                                        if (actionInv >= 1 && actionInv <= z)
-                                                        {
-                                                            if (actionInv == z)
-                                                            {
-                                                                break inv;
-                                                            }
-                                                            actionInv--;
-
-                                                            Item selectedItem = inventory.getItem(actionInv);
-                                                            selectedItem.useOnBoss(player[plchoise], boss[ran3]);
-
-                                                            if (inventory.getItem(actionInv).onetimeuse == true)
-                                                            {
-                                                                inventory.removeItem(selectedItem);
-                                                            }
-                                                            if (boss[ran3].health > 0)
-                                                            {
-                                                                boss[ran3].attack(player[plchoise]);
-                                                            }
-                                                            break inv;
-                                                        }
-                                                        else
-                                                        {
-                                                            System.out.println("Ungueltige Option! Nur Zahlen (1-" + z + ")");
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        System.out.println("Das ist keine Zahl!");
-                                                        scanner.nextLine();
-                                                    }
-                                                }
-
-                                                break;
-                                            case 4:
-                                                // fliehen / exit game
-                                                break out;
-                                        }
-                                        break;
-                                    }
-                                    else
-                                    {
-                                        System.out.println("Ungueltige Option! Nur Zahlen (1-4)");
-                                    }
-                                }
-                                else
-                                {
-                                    System.out.println("Das ist keine Zahl!");
-                                    scanner.next();
-                                }
-
+                                break;
                             }
-
-                            System.out.println
-                                    (
-                                            "Du hast den Boss " + boss[ran3].name + " besiegt und hast " + boss[ran3].coins + " Coins und " + boss[ran3].exp + " EP bekommen!" +
-                                                    "\nDruecke Taste ENTER um weiter zu spielen!"
-                                    );
-
-                            loot.getBossDrop(player[plchoise], boss[ran3]);
-                            loot.chest(inventory, random);
-                            boss[ran3].health = boss[ran3].maxHealth;
-                            level.levelUp(player[plchoise]);
-
-                            break;
-
                         }
-
                     }
 
                     loot.chest(inventory, random);
@@ -563,7 +325,7 @@ class Game{
                                 {
                                     if (action == 1)
                                     {
-                                        shopCreater.createShop(random, item, player[plchoise], inventory, scanner);
+                                        shopCreater.createShop(random, player[plchoise], inventory, scanner);
                                         break shop;
                                     }
                                     else
@@ -614,6 +376,10 @@ class Inventory{
 
     public int size(){
         return items.size();
+    }
+
+    public void itemUse(){
+
     }
 }
 
@@ -712,7 +478,7 @@ class ItemFactory{
 // hiermit wird der Shop erstellt
 class ShopCreater{
 
-    public Item[] createShop(Random random, Item[] items, Player player, Inventory inventory, Scanner scanner) {
+    public Item[] createShop(Random random, Player player, Inventory inventory, Scanner scanner) {
         int action;
         Item[] shopItems = new Item[3];
         shopItems[0] = ItemFactory.getRandom(random);
@@ -788,6 +554,105 @@ class Level{
     }
 }
 
+class Fight{
+    public void fight(Player player, Entity entity, Inventory inventory, Scanner scanner) {
+        fight: while (true)
+        {
+            System.out.println("Waehle deine aktion (1-4):");
+
+            if (scanner.hasNextInt()) {
+                int action;
+                action = scanner.nextInt();
+
+                if (action >= 1 || action <= 4) {
+                    switch (action) {
+                        case 1:
+                            // Angriff Logik
+                            entity.attack(player, entity);
+
+                            if (entity.health <= 0) {
+                                break;
+                            } else {
+                                entity.attack(entity, player);
+                            }
+                            // TUI
+                            System.out.println
+                                    (
+                                            "Der Gegner hat noch " + entity.health + "/" + entity.maxHealth + " HP" +
+                                                    "\nDu hast " + entity.attackDamage + " schaden bekommen. Du hast noch " +
+                                                    player.health + "/" + player.maxHealth + " HP"
+                                    );
+                            break;
+
+                        case 2:
+                            // Player heal Logik
+                            player.heal();
+
+                            break;
+
+                        case 3:
+                            // Inventar Logik
+                            int z = 1;
+                            int actionInv;
+                            for (int i = 0; i < inventory.size(); i++) {
+                                Item UpdatetItem = inventory.getItem(i);
+                                System.out.println("(" + z + ")" + UpdatetItem.name);
+                                z++;
+                            }
+
+                            System.out.println("(" + z + ")" + "Exit");
+
+                            inv:
+                            while (true) {
+                                if (scanner.hasNextInt()) {
+                                    actionInv = scanner.nextInt();
+
+                                    if (actionInv >= 1 && actionInv <= z) {
+                                        if (actionInv == z) {
+                                            break inv;
+                                        }
+                                        actionInv--;
+
+                                        Item selectedItem = inventory.getItem(actionInv);
+                                        selectedItem.use(player, entity);
+
+                                        if (inventory.getItem(actionInv).onetimeuse == true) {
+                                            inventory.removeItem(selectedItem);
+                                        }
+                                        if (entity.health > 0) {
+                                            entity.attack(player, entity);
+                                        }
+                                        break inv;
+                                    } else {
+                                        System.out.println("Ungueltige Option! Nur Zahlen (1-" + z + ")");
+                                    }
+                                } else {
+                                    System.out.println("Das ist keine Zahl!");
+                                    scanner.nextLine();
+                                }
+                            }
+
+                            break;
+                        case 4:
+                            // fliehen / exit game
+                            break fight;
+                    }
+                    break fight;
+                }
+                else
+                {
+                    System.out.println("Ungueltige Option! Nur Zahlen (1-4)");
+                }
+            }
+            else
+            {
+                System.out.println("Das ist keine Zahl!");
+                scanner.next();
+            }
+        }
+    }
+}
+
 // Cheats ;)
 class DevTools{
     public void getAllItems(Item[] items, Inventory inventory){
@@ -802,5 +667,3 @@ class DevTools{
 
     public void oneHit(Player player){
         player.attackDamage = 1000000;
-    }
-}
